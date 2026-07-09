@@ -1,0 +1,12 @@
+.vscode/**
+.idea/**
+node_modules/**
+src/**
+webview/**
+articles/**
+books/**
+esbuild.mjs
+tsconfig.json
+package-lock.json
+**/*.map
+.gitignore

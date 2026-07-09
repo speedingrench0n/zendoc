@@ -1,0 +1,105 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--vscode-editor-background);
+}
+
+#app,
+#raw {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 48px 45vh;
+}
+
+.zd-hidden {
+  display: none !important;
+}
+
+.milkdown {
+  background: transparent;
+}
+
+/* --- floating toolbar ---------------------------------------------------- */
+#zd-toolbar {
+  position: fixed;
+  top: 10px;
+  right: 14px;
+  z-index: 100;
+  display: flex;
+  gap: 6px;
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+#zd-toolbar:hover {
+  opacity: 1;
+}
+
+#zd-toolbar button {
+  appearance: none;
+  border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+#zd-toolbar button:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
+}
+
+/* --- raw (codemirror) mode ------------------------------------------------ */
+#raw .cm-editor {
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 14px);
+  background: transparent;
+}
+
+#raw .cm-editor.cm-focused {
+  outline: none;
+}
+
+#raw .cm-gutters {
+  background: transparent;
+  border-right: none;
+  color: var(--vscode-editorLineNumber-foreground, #858585);
+}
+
+body.zd-dark #raw .cm-editor,
+body.zd-dark #raw .cm-gutters,
+body.zd-dark #raw .cm-activeLineGutter {
+  background: transparent;
+}
+
+/* --- mermaid diagrams ----------------------------------------------------- */
+.zd-mermaid {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  overflow-x: auto;
+}
+
+.zd-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.zd-mermaid-error {
+  display: block;
+  white-space: pre-wrap;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  color: var(--vscode-errorForeground, #f14c4c);
+  border: 1px solid var(--vscode-errorForeground, #f14c4c);
+  border-radius: 4px;
+  padding: 8px 10px;
+}

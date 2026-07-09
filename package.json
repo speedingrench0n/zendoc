@@ -1,23 +1,108 @@
 {
   "name": "zendoc",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "displayName": "ZenDoc — WYSIWYG Markdown Editor",
+  "description": "Notion-like WYSIWYG markdown editor for VSCode. Live-synced with the .md file, with instant raw/rich toggle, mermaid diagrams and syntax-highlighted code blocks.",
+  "version": "0.1.0",
+  "publisher": "speedingrench0n",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/speedingrench0n/zendoc.git"
   },
-  "keywords": [],
-  "author": "",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/speedingrench0n/zendoc/issues"
+  "engines": {
+    "vscode": "^1.90.0"
   },
-  "homepage": "https://github.com/speedingrench0n/zendoc#readme",
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "zendoc.editor",
+        "displayName": "ZenDoc Markdown",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "commands": [
+      {
+        "command": "zendoc.openWith",
+        "title": "Open with ZenDoc",
+        "category": "ZenDoc",
+        "icon": "$(book)"
+      },
+      {
+        "command": "zendoc.openSource",
+        "title": "Open in Text Editor",
+        "category": "ZenDoc",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "zendoc.toggleRaw",
+        "title": "Toggle Markdown Rendering (Rich / Raw)",
+        "category": "ZenDoc",
+        "icon": "$(code)"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "zendoc.openWith",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "zendoc.toggleRaw",
+          "when": "activeCustomEditorId == zendoc.editor",
+          "group": "navigation@1"
+        },
+        {
+          "command": "zendoc.openSource",
+          "when": "activeCustomEditorId == zendoc.editor",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "zendoc.toggleRaw",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m",
+        "when": "activeCustomEditorId == zendoc.editor"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "vscode:prepublish": "node esbuild.mjs --production"
+  },
   "dependencies": {
     "zenn-cli": "^0.1.135"
+  },
+  "devDependencies": {
+    "@codemirror/commands": "^6.6.0",
+    "@codemirror/lang-markdown": "^6.3.0",
+    "@codemirror/language": "^6.10.0",
+    "@codemirror/language-data": "^6.5.0",
+    "@codemirror/state": "^6.4.0",
+    "@codemirror/theme-one-dark": "^6.1.3",
+    "@codemirror/view": "^6.28.0",
+    "@milkdown/crepe": "^7.15.0",
+    "@milkdown/kit": "^7.15.0",
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.25.0",
+    "mermaid": "^11.4.0",
+    "typescript": "^5.6.0"
   }
 }
