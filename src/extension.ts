@@ -48,6 +48,13 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // Toggle the diff-vs-HEAD display inside the active ZenDoc editor.
+  context.subscriptions.push(
+    vscode.commands.registerCommand("zendoc.toggleDiff", () => {
+      provider.toggleActiveDiff();
+    })
+  );
+
   context.subscriptions.push(
     vscode.window.onDidChangeActiveColorTheme(() => {
       provider.broadcastTheme();

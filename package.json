@@ -48,6 +48,12 @@
         "title": "Toggle Markdown Rendering (Rich / Raw)",
         "category": "ZenDoc",
         "icon": "$(code)"
+      },
+      {
+        "command": "zendoc.toggleDiff",
+        "title": "Toggle Diff Against HEAD",
+        "category": "ZenDoc",
+        "icon": "$(git-compare)"
       }
     ],
     "menus": {
@@ -60,14 +66,19 @@
       ],
       "editor/title": [
         {
-          "command": "zendoc.toggleRaw",
+          "command": "zendoc.toggleDiff",
           "when": "activeCustomEditorId == zendoc.editor",
           "group": "navigation@1"
         },
         {
-          "command": "zendoc.openSource",
+          "command": "zendoc.toggleRaw",
           "when": "activeCustomEditorId == zendoc.editor",
           "group": "navigation@2"
+        },
+        {
+          "command": "zendoc.openSource",
+          "when": "activeCustomEditorId == zendoc.editor",
+          "group": "navigation@3"
         }
       ]
     },
@@ -76,6 +87,12 @@
         "command": "zendoc.toggleRaw",
         "key": "ctrl+alt+m",
         "mac": "cmd+alt+m",
+        "when": "activeCustomEditorId == zendoc.editor"
+      },
+      {
+        "command": "zendoc.toggleDiff",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
         "when": "activeCustomEditorId == zendoc.editor"
       }
     ]
@@ -94,6 +111,7 @@
     "@codemirror/lang-markdown": "^6.3.0",
     "@codemirror/language": "^6.10.0",
     "@codemirror/language-data": "^6.5.0",
+    "@codemirror/merge": "^6.12.2",
     "@codemirror/state": "^6.4.0",
     "@codemirror/theme-one-dark": "^6.1.3",
     "@codemirror/view": "^6.28.0",

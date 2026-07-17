@@ -57,6 +57,35 @@ body {
   background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
 }
 
+#zd-toolbar button.zd-active {
+  background: var(--vscode-button-background, #0e639c);
+  color: var(--vscode-button-foreground, #ffffff);
+  border-color: transparent;
+}
+
+/* --- transient notice ------------------------------------------------------ */
+#zd-notice {
+  position: fixed;
+  top: 48px;
+  right: 14px;
+  z-index: 100;
+  max-width: 340px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+#zd-notice.zd-visible {
+  opacity: 1;
+}
+
 /* --- raw (codemirror) mode ------------------------------------------------ */
 #raw .cm-editor {
   font-family: var(--vscode-editor-font-family, monospace);
@@ -78,6 +107,36 @@ body.zd-dark #raw .cm-editor,
 body.zd-dark #raw .cm-gutters,
 body.zd-dark #raw .cm-activeLineGutter {
   background: transparent;
+}
+
+/* --- rendered diff (rich mode) --------------------------------------------
+   The diff review runs current doc -> HEAD baseline, so the component's
+   "removed" chunks are the user's ADDITIONS and its "added" widgets carry
+   the baseline content the user DELETED. Swapping the two color variables
+   flips every derived background/text/button color to match, since the
+   crepe theme derives them via color-mix at the same .milkdown scope. */
+.milkdown {
+  --crepe-color-diff-added: #ef4444;
+  --crepe-color-diff-removed: #22c55e;
+}
+
+/* additions since HEAD: keep readable, no strikethrough */
+.milkdown .milkdown-diff-removed {
+  text-decoration: none;
+}
+
+.milkdown .milkdown-diff-removed-block {
+  opacity: 1;
+}
+
+/* deletions since HEAD: baseline content, struck through */
+.milkdown .milkdown-diff-added {
+  text-decoration: line-through;
+}
+
+.milkdown .milkdown-diff-added-block {
+  opacity: 0.7;
+  text-decoration: line-through;
 }
 
 /* --- mermaid diagrams ----------------------------------------------------- */

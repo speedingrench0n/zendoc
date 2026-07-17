@@ -1,5 +1,9 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Messages exchanged with the webview.
@@ -9,6 +13,8 @@ import * as path from "path";
  *   { type: "update", text }                       external edit (git, other tab, undo in source, ...)
  *   { type: "theme",  dark }                       VSCode color theme changed
  *   { type: "toggle-mode" }                        toggle rich/raw rendering
+ *   { type: "toggle-diff" }                        toggle diff-vs-HEAD display
+ *   { type: "baseline", text | error }             git HEAD content of the document
  *   { type: "upload-image-result", id, relPath | error }
  *
  * webview -> extension:
@@ -16,6 +22,7 @@ import * as path from "path";
  *   { type: "change", text }                       user edited (rich or raw mode)
  *   { type: "save" }                               user hit Ctrl/Cmd+S inside the webview
  *   { type: "open-source" }                        open the plain text editor
+ *   { type: "request-baseline" }                   fetch git HEAD content for diffing
  *   { type: "upload-image", id, name, base64 }     paste / drop image
  */
 export class ZendocEditorProvider implements vscode.CustomTextEditorProvider {
@@ -34,6 +41,11 @@ export class ZendocEditorProvider implements vscode.CustomTextEditorProvider {
   /** Ask the focused editor to toggle between rich and raw rendering. */
   public toggleActiveMode(): void {
     this.active?.panel.webview.postMessage({ type: "toggle-mode" });
+  }
+
+  /** Ask the focused editor to toggle the diff-vs-HEAD display. */
+  public toggleActiveDiff(): void {
+    this.active?.panel.webview.postMessage({ type: "toggle-diff" });
   }
 
   public broadcastTheme(): void {
@@ -188,6 +200,19 @@ export class ZendocEditorProvider implements vscode.CustomTextEditorProvider {
           void vscode.commands.executeCommand("vscode.openWith", document.uri, "default");
           break;
         }
+        case "request-baseline": {
+          void this.getGitBaseline(document)
+            .then((text) => {
+              webviewPanel.webview.postMessage({ type: "baseline", text });
+            })
+            .catch((err) => {
+              webviewPanel.webview.postMessage({
+                type: "baseline",
+                error: gitErrorMessage(err),
+              });
+            });
+          break;
+        }
         case "upload-image": {
           void this.saveImage(document, String(msg.name ?? "image.png"), String(msg.base64 ?? ""))
             .then((relPath) => {
@@ -208,6 +233,29 @@ export class ZendocEditorProvider implements vscode.CustomTextEditorProvider {
         }
       }
     });
+  }
+
+  /** The document's content at git HEAD, used as the diff baseline. */
+  private async getGitBaseline(document: vscode.TextDocument): Promise<string> {
+    if (document.uri.scheme !== "file") {
+      throw new Error("document is not a file on disk");
+    }
+    const docDir = path.dirname(document.uri.fsPath);
+    const { stdout: topOut } = await execFileAsync(
+      "git",
+      ["-C", docDir, "rev-parse", "--show-toplevel"]
+    );
+    const repoRoot = topOut.trim();
+    const relPath = path
+      .relative(repoRoot, document.uri.fsPath)
+      .split(path.sep)
+      .join("/");
+    const { stdout } = await execFileAsync(
+      "git",
+      ["-C", repoRoot, "show", `HEAD:${relPath}`],
+      { maxBuffer: 64 * 1024 * 1024 }
+    );
+    return stdout;
   }
 
   /** Save a pasted/dropped image next to the document under assets/, return the relative path. */
@@ -271,6 +319,22 @@ export class ZendocEditorProvider implements vscode.CustomTextEditorProvider {
 </body>
 </html>`;
   }
+}
+
+/** Turn raw git stderr into something readable in the webview notice. */
+function gitErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (/not a git repository/i.test(raw)) {
+    return "file is not inside a git repository";
+  }
+  if (/does not exist in 'HEAD'|exists on disk, but not in/i.test(raw)) {
+    return "file has no committed version yet (new file)";
+  }
+  if (/HEAD/.test(raw) && /unknown revision|ambiguous argument/i.test(raw)) {
+    return "repository has no commits yet";
+  }
+  const line = raw.split("\n").find((l) => l.includes("fatal:")) ?? raw;
+  return line.replace(/^.*fatal:\s*/, "").trim() || "git error";
 }
 
 export function isDarkTheme(): boolean {

@@ -3,6 +3,17 @@ import { editorViewCtx, parserCtx } from "@milkdown/kit/core";
 import { Slice } from "@milkdown/kit/prose/model";
 import { TextSelection } from "@milkdown/kit/prose/state";
 import {
+  diff as diffPlugin,
+  startDiffReviewCmd,
+  clearDiffReviewCmd,
+} from "@milkdown/kit/plugin/diff";
+import {
+  diffComponent,
+  diffComponentConfig,
+} from "@milkdown/kit/component/diff";
+import { callCommand } from "@milkdown/kit/utils";
+import { unifiedMergeView } from "@codemirror/merge";
+import {
   EditorView as CMView,
   keymap as cmKeymap,
   drawSelection,
@@ -62,6 +73,11 @@ let currentText = "";
 let sentText = "";
 /** True while an external update / mode switch is being applied. */
 let applyingExternal = false;
+
+/** Diff-against-HEAD state. */
+let diffActive = false;
+let baselineText: string | undefined;
+let baselinePending = false;
 
 // ---------------------------------------------------------------------------
 // document sync: local edits are debounced so the text document's undo
@@ -223,6 +239,20 @@ async function createRichEditor(initialText: string): Promise<void> {
     });
   });
 
+  // Diff review support: shows changes against the git HEAD baseline.
+  // Direction is current -> baseline, so "accept" restores the baseline
+  // chunk (Revert) and "reject" keeps the current text (Keep).
+  crepe.editor
+    .config((ctx) => {
+      ctx.update(diffComponentConfig.key, (config) => ({
+        ...config,
+        acceptLabel: "Revert",
+        rejectLabel: "Keep",
+      }));
+    })
+    .use(diffPlugin)
+    .use(diffComponent);
+
   await crepe.create();
 }
 
@@ -262,6 +292,7 @@ function applyToRich(text: string) {
 // raw editor (codemirror 6)
 // ---------------------------------------------------------------------------
 const cmThemeCompartment = new Compartment();
+const cmDiffCompartment = new Compartment();
 
 function cmThemeExtensions(dark: boolean): CMExtension {
   return dark ? oneDark : syntaxHighlighting(defaultHighlightStyle);
@@ -281,6 +312,7 @@ function createRawEditor(initialText: string) {
         cmMarkdown({ codeLanguages }),
         CMView.lineWrapping,
         cmThemeCompartment.of(cmThemeExtensions(isDark)),
+        cmDiffCompartment.of([]),
         CMView.updateListener.of((update) => {
           if (!update.docChanged || applyingExternal || mode !== "raw") {
             return;
@@ -311,9 +343,107 @@ function applyToRaw(text: string) {
 }
 
 // ---------------------------------------------------------------------------
+// diff against the git HEAD baseline (rendered in rich mode, unified in raw)
+// ---------------------------------------------------------------------------
+function enableRichDiff() {
+  if (baselineText === undefined) {
+    return;
+  }
+  crepe?.editor.action(callCommand(startDiffReviewCmd.key, baselineText));
+}
+
+function disableRichDiff() {
+  crepe?.editor.action(callCommand(clearDiffReviewCmd.key));
+}
+
+function enableRawDiff() {
+  if (baselineText === undefined) {
+    return;
+  }
+  cmView?.dispatch({
+    effects: cmDiffCompartment.reconfigure(
+      unifiedMergeView({
+        original: baselineText,
+        allowInlineDiffs: true,
+        // same wording as the rendered diff: keep the edit / revert to HEAD
+        mergeControls: (type, action) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.name = type;
+          btn.textContent = type === "accept" ? "Keep" : "Revert";
+          btn.addEventListener("click", action);
+          return btn;
+        },
+      })
+    ),
+  });
+}
+
+function disableRawDiff() {
+  cmView?.dispatch({ effects: cmDiffCompartment.reconfigure([]) });
+}
+
+function toggleDiff() {
+  if (diffActive) {
+    diffActive = false;
+    baselineText = undefined; // refetched next time, so it tracks new commits
+    if (mode === "rich") {
+      disableRichDiff();
+    } else {
+      disableRawDiff();
+    }
+    document.body.classList.remove("zd-diffing");
+    updateDiffButton();
+    return;
+  }
+  if (baselinePending) {
+    return;
+  }
+  baselinePending = true;
+  vscode.postMessage({ type: "request-baseline" });
+}
+
+function onBaseline(text: string | undefined, error: string | undefined) {
+  baselinePending = false;
+  if (error !== undefined || text === undefined) {
+    showNotice(`Diff unavailable: ${error ?? "no baseline"}`);
+    return;
+  }
+  baselineText = text;
+  diffActive = true;
+  if (mode === "rich") {
+    enableRichDiff();
+  } else {
+    enableRawDiff();
+  }
+  document.body.classList.add("zd-diffing");
+  updateDiffButton();
+}
+
+let noticeTimer: number | undefined;
+
+function showNotice(text: string) {
+  let el = document.getElementById("zd-notice");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "zd-notice";
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.add("zd-visible");
+  if (noticeTimer !== undefined) {
+    clearTimeout(noticeTimer);
+  }
+  noticeTimer = window.setTimeout(() => {
+    el.classList.remove("zd-visible");
+  }, 4000);
+}
+
+// ---------------------------------------------------------------------------
 // mode toggle (instant rich <-> raw)
 // ---------------------------------------------------------------------------
 let toggleBtn: HTMLButtonElement | undefined;
+let diffBtn: HTMLButtonElement | undefined;
 
 function setMode(next: Mode) {
   if (mode === next) {
@@ -322,12 +452,24 @@ function setMode(next: Mode) {
   flushSend(); // push pending local edits before switching views
   mode = next;
   if (next === "raw") {
+    if (diffActive) {
+      disableRichDiff();
+    }
     applyToRaw(currentText);
+    if (diffActive) {
+      enableRawDiff();
+    }
     appEl.classList.add("zd-hidden");
     rawEl.classList.remove("zd-hidden");
     cmView?.focus();
   } else {
+    if (diffActive) {
+      disableRawDiff();
+    }
     applyToRich(currentText);
+    if (diffActive) {
+      enableRichDiff();
+    }
     rawEl.classList.add("zd-hidden");
     appEl.classList.remove("zd-hidden");
     crepe?.editor.action((ctx) => ctx.get(editorViewCtx).focus());
@@ -351,9 +493,25 @@ function updateToggleButton() {
       : "Show rendered markdown (Ctrl+Alt+M)";
 }
 
+function updateDiffButton() {
+  if (!diffBtn) {
+    return;
+  }
+  diffBtn.classList.toggle("zd-active", diffActive);
+  diffBtn.title = diffActive
+    ? "Hide changes since HEAD (Ctrl+Alt+D)"
+    : "Show changes since HEAD (Ctrl+Alt+D)";
+}
+
 function createToolbar() {
   const bar = document.createElement("div");
   bar.id = "zd-toolbar";
+
+  diffBtn = document.createElement("button");
+  diffBtn.type = "button";
+  diffBtn.textContent = "± Diff";
+  diffBtn.addEventListener("click", toggleDiff);
+  bar.appendChild(diffBtn);
 
   toggleBtn = document.createElement("button");
   toggleBtn.type = "button";
@@ -371,6 +529,7 @@ function createToolbar() {
 
   document.body.appendChild(bar);
   updateToggleButton();
+  updateDiffButton();
 }
 
 // ---------------------------------------------------------------------------
@@ -418,7 +577,16 @@ function applyExternal(text: string) {
   currentText = text;
   sentText = text; // the document already holds this text
   if (mode === "rich") {
-    applyToRich(text);
+    // While a diff review is active the diff plugin blocks every
+    // doc-changing transaction that isn't its own, so suspend the review
+    // around the update and restart it against the same baseline.
+    if (diffActive) {
+      disableRichDiff();
+      applyToRich(text);
+      enableRichDiff();
+    } else {
+      applyToRich(text);
+    }
   } else {
     applyToRaw(text);
   }
@@ -464,6 +632,17 @@ window.addEventListener("message", (event) => {
       toggleMode();
       break;
     }
+    case "toggle-diff": {
+      toggleDiff();
+      break;
+    }
+    case "baseline": {
+      onBaseline(
+        typeof msg.text === "string" ? msg.text : undefined,
+        typeof msg.error === "string" ? msg.error : undefined
+      );
+      break;
+    }
     case "upload-image-result": {
       const pending = pendingUploads.get(msg.id);
       if (!pending) {
@@ -494,6 +673,9 @@ window.addEventListener(
     } else if (mod && e.altKey && e.key.toLowerCase() === "m") {
       e.preventDefault();
       toggleMode();
+    } else if (mod && e.altKey && e.key.toLowerCase() === "d") {
+      e.preventDefault();
+      toggleDiff();
     }
   },
   true

@@ -22,6 +22,17 @@ behave like a normal text editor.
   markdown (CodeMirror with syntax highlighting) without leaving the tab:
   the floating `</> Raw` button, the title bar icon, or `Ctrl+Alt+M`
   (`Cmd+Alt+M` on macOS).
+- **Diff against HEAD** — see what changed since the last commit without
+  leaving the editor (`± Diff` button, title bar icon, or `Ctrl+Alt+D`),
+  in either of two forms:
+  - *Rendered diff* (rich mode): changes are shown inline in the rendered
+    document — additions highlighted green, deleted baseline content shown
+    struck through in red — with per-chunk **Revert** (back to HEAD) /
+    **Keep** buttons. The rendered diff is a read-only review; reverts are
+    normal edits and undoable once you leave the diff.
+  - *Raw diff* (raw mode): an editable unified diff (CodeMirror merge view)
+    with the same per-chunk Revert/Keep controls.
+  Toggling rich/raw while the diff is on switches between the two forms.
 - **Mermaid** — ` ```mermaid ` code blocks render as diagrams with a
   preview/code toggle, following the light/dark theme.
 - **Code snippets** — syntax-highlighted code blocks with a searchable
@@ -38,6 +49,7 @@ use the *Open in Text Editor* title button, or right-click the tab →
 | `ZenDoc: Open with ZenDoc` | Open a markdown file in the rich editor |
 | `ZenDoc: Open in Text Editor` | Escape hatch to the plain source editor |
 | `ZenDoc: Toggle Markdown Rendering (Rich / Raw)` | Instant render on/off (`Ctrl+Alt+M`) |
+| `ZenDoc: Toggle Diff Against HEAD` | Show/hide changes since the last commit (`Ctrl+Alt+D`) |
 
 To make the text editor the default again, add to `settings.json`:
 
